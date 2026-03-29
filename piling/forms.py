@@ -295,15 +295,24 @@ class ConcretingForm(forms.ModelForm):
     class Meta:
         model = Pile
         fields = [
+            # Rebar cage
+            "main_bar_count",
+            "main_bar_dia_mm",
+            "stiffener_dia_mm",
+            "stiffener_spacing_m",
+            "spiral_dia_mm",
+            "spiral_pitch_m",
+            "lap_length_m",
+            "concrete_cover_mm",
+            "cover_blocks_fixed",
             "rebar_lowering_start",
             "rebar_lowering_end",
-            "cover_blocks_fixed",
-            "main_bars_spec",
-            "stiffener_spec",
-            "spiral_bars_spec",
+            # Flushing
             "flushing_start",
             "flushing_end",
             "inspection_collapse",
+            # Concreting
+            "projection_above_ground_m",
             "casting_start",
             "casting_end",
             "actual_concrete_m3",
@@ -311,21 +320,38 @@ class ConcretingForm(forms.ModelForm):
             "rough_sheet_photo",
         ]
         widgets = {
+            "main_bar_count": forms.NumberInput(
+                attrs={**field_attrs("e.g. 12"), "min": "1", "max": "40"}
+            ),
+            "main_bar_dia_mm": forms.NumberInput(
+                attrs={**field_attrs("e.g. 32"), "step": "1", "min": "6", "max": "50"}
+            ),
+            "stiffener_dia_mm": forms.NumberInput(
+                attrs={**field_attrs("e.g. 16"), "step": "1", "min": "6"}
+            ),
+            "stiffener_spacing_m": forms.NumberInput(
+                attrs={**field_attrs("e.g. 2.25"), "step": "0.05", "min": "0.1"}
+            ),
+            "spiral_dia_mm": forms.NumberInput(
+                attrs={**field_attrs("e.g. 10"), "step": "1", "min": "6"}
+            ),
+            "spiral_pitch_m": forms.NumberInput(
+                attrs={**field_attrs("e.g. 0.26"), "step": "0.01", "min": "0.05"}
+            ),
+            "lap_length_m": forms.NumberInput(
+                attrs={**field_attrs("default 1.6m"), "step": "0.1", "min": "0"}
+            ),
+            "concrete_cover_mm": forms.NumberInput(
+                attrs={**field_attrs("default 75mm"), "step": "5", "min": "25"}
+            ),
+            "cover_blocks_fixed": forms.CheckboxInput(
+                attrs={"class": "field-checkbox"}
+            ),
             "rebar_lowering_start": forms.DateTimeInput(
                 attrs={**datetime_attrs(), "type": "datetime-local"}
             ),
             "rebar_lowering_end": forms.DateTimeInput(
                 attrs={**datetime_attrs(), "type": "datetime-local"}
-            ),
-            "cover_blocks_fixed": forms.CheckboxInput(
-                attrs={"class": "field-checkbox"}
-            ),
-            "main_bars_spec": forms.TextInput(attrs=field_attrs("e.g. 32mm")),
-            "stiffener_spec": forms.TextInput(
-                attrs=field_attrs("e.g. 2.25m spacing")
-            ),
-            "spiral_bars_spec": forms.TextInput(
-                attrs=field_attrs("e.g. 260mm @ 1/c")
             ),
             "flushing_start": forms.DateTimeInput(
                 attrs={**datetime_attrs(), "type": "datetime-local"}
@@ -335,6 +361,9 @@ class ConcretingForm(forms.ModelForm):
             ),
             "inspection_collapse": forms.NullBooleanSelect(
                 attrs={"class": FIELD_CLASS}
+            ),
+            "projection_above_ground_m": forms.NumberInput(
+                attrs={**field_attrs("e.g. 0.5 (0 if none)"), "step": "0.1", "min": "0"}
             ),
             "casting_start": forms.DateTimeInput(
                 attrs={**datetime_attrs(), "type": "datetime-local"}
@@ -358,17 +387,26 @@ class ConcretingForm(forms.ModelForm):
             ),
         }
         labels = {
+            "main_bar_count":       "Number of main bars",
+            "main_bar_dia_mm":      "Main bar diameter (mm)",
+            "stiffener_dia_mm":     "Stiffener ring diameter (mm)",
+            "stiffener_spacing_m":  "Stiffener spacing c/c (m)",
+            "spiral_dia_mm":        "Spiral bar diameter (mm)",
+            "spiral_pitch_m":       "Spiral pitch c/c (m)",
+            "lap_length_m":         "Lap length above cutoff (m)",
+            "concrete_cover_mm":    "Concrete cover (mm)",
+            "cover_blocks_fixed":   "Cover blocks fixed?",
             "rebar_lowering_start": "Rebar lowering — start",
-            "rebar_lowering_end": "Rebar lowering — end",
-            "cover_blocks_fixed": "Cover blocks fixed?",
-            "flushing_start": "Flushing — start",
-            "flushing_end": "Flushing — end",
-            "inspection_collapse": "Borehole inspection",
-            "casting_start": "Concreting — start",
-            "casting_end": "Concreting — end",
-            "actual_concrete_m3": "Actual concrete poured (m³)",
-            "concrete_slump_mm": "Slump (mm)",
-            "rough_sheet_photo": "Photo of rough sheet (audit)",
+            "rebar_lowering_end":   "Rebar lowering — end",
+            "flushing_start":       "Flushing — start",
+            "flushing_end":         "Flushing — end",
+            "inspection_collapse":  "Borehole inspection",
+            "projection_above_ground_m": "Projection above ground (m)",
+            "casting_start":        "Concreting — start",
+            "casting_end":          "Concreting — end",
+            "actual_concrete_m3":   "Actual concrete poured (m³)",
+            "concrete_slump_mm":    "Slump (mm)",
+            "rough_sheet_photo":    "Photo of rough sheet (audit)",
         }
 
     def clean(self):

@@ -1,48 +1,102 @@
 {% extends "piling/base.html" %}
 {% load piling_tags %}
 
-{% block title %}Concreting — YusBuild{% endblock %}
+{% block title %}Rebar & Concreting — YusBuild{% endblock %}
 
 {% block content %}
 <div class="page-title">Rebar & concreting</div>
-<div class="page-subtitle">Step 6 of 6 — Final operations data</div>
-
-<!-- Calculated reference from tremie step -->
-{% if theoretical_volume %}
-<div class="calc-box" style="margin-bottom:16px">
-  <div class="calc-row">
-    <span class="calc-label">Tremie total depth</span>
-    <span class="calc-value">{{ tremie_total }} m</span>
-  </div>
-  <div class="calc-row">
-    <span class="calc-label">Theoretical volume</span>
-    <span class="calc-value" style="color:#60a5fa">{{ theoretical_volume }} m³</span>
-  </div>
-  <div class="calc-row">
-    <span class="calc-label">Volume deviation</span>
-    <span class="calc-value" id="live-deviation">Enter actual concrete below</span>
-  </div>
-</div>
-{% endif %}
+<div class="page-subtitle">Step 6 of 6 — Reinforcement cage and casting data</div>
 
 <form method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
 
   <div class="card">
-    <div class="card-title">Steel reinforcement</div>
+    <div class="card-title">Main longitudinal bars</div>
 
     <div class="field-group">
-      <label class="field-label">Main bars</label>
-      {{ form.main_bars_spec }}
+      <label class="field-label" for="{{ form.main_bar_count.id_for_label }}">Number of main bars</label>
+      {{ form.main_bar_count }}
+      {% if form.main_bar_count.errors %}<div class="field-error">{{ form.main_bar_count.errors.0 }}</div>{% endif %}
     </div>
+
     <div class="field-group">
-      <label class="field-label">Stiffeners</label>
-      {{ form.stiffener_spec }}
+      <label class="field-label" for="{{ form.main_bar_dia_mm.id_for_label }}">Main bar diameter (mm)</label>
+      {{ form.main_bar_dia_mm }}
+      <div class="field-hint">e.g. 32mm — unit weight auto-calculated</div>
     </div>
+
     <div class="field-group">
-      <label class="field-label">Spiral bars</label>
-      {{ form.spiral_bars_spec }}
+      <label class="field-label" for="{{ form.lap_length_m.id_for_label }}">Lap length above cutoff (m)</label>
+      {{ form.lap_length_m }}
+      <div class="field-hint">Project default: {{ pile.project.default_lap_length_m }}m — leave blank to use default</div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Stiffener rings</div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.stiffener_dia_mm.id_for_label }}">Stiffener ring bar diameter (mm)</label>
+      {{ form.stiffener_dia_mm }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.stiffener_spacing_m.id_for_label }}">Spacing centre-to-centre (m)</label>
+      {{ form.stiffener_spacing_m }}
+      <div class="field-hint">e.g. 2.25m</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Spiral / helix reinforcement</div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.spiral_dia_mm.id_for_label }}">Spiral bar diameter (mm)</label>
+      {{ form.spiral_dia_mm }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.spiral_pitch_m.id_for_label }}">Pitch centre-to-centre (m)</label>
+      {{ form.spiral_pitch_m }}
+      <div class="field-hint">e.g. 0.26m (260mm)</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.concrete_cover_mm.id_for_label }}">Concrete cover (mm)</label>
+      {{ form.concrete_cover_mm }}
+      <div class="field-hint">Project default: {{ pile.project.default_concrete_cover_mm }}mm</div>
+    </div>
+  </div>
+
+  <!-- Live reinforcement calculation panel -->
+  <div class="calc-box" id="rebar-calc">
+    <div class="calc-row">
+      <span class="calc-label">Pile depth used</span>
+      <span class="calc-value" id="c-depth">{{ pile.actual_depth_from_casing_m|default:pile.design_depth_m }} m</span>
+    </div>
+    <div class="calc-row">
+      <span class="calc-label">Cage length (depth + lap)</span>
+      <span class="calc-value" id="c-cage">—</span>
+    </div>
+    <div style="height:1px;background:rgba(59,130,246,.2);margin:8px 0;"></div>
+    <div class="calc-row">
+      <span class="calc-label">Stiffener rings</span>
+      <span class="calc-value" id="c-stiff">—</span>
+    </div>
+    <div class="calc-row">
+      <span class="calc-label">Spiral rings</span>
+      <span class="calc-value" id="c-spiral">—</span>
+    </div>
+    <div style="height:1px;background:rgba(59,130,246,.2);margin:8px 0;"></div>
+    <div class="calc-row">
+      <span class="calc-label">Total rebar weight</span>
+      <span class="calc-value" id="c-weight" style="color:#60a5fa;">—</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="card-title">Rebar cage installation</div>
+
     <div class="field-group">
       <div class="field-row">
         {{ form.cover_blocks_fixed }}
@@ -54,6 +108,7 @@
       <label class="field-label">Rebar lowering — start</label>
       {{ form.rebar_lowering_start }}
     </div>
+
     <div class="field-group">
       <label class="field-label">Rebar lowering — end</label>
       {{ form.rebar_lowering_end }}
@@ -72,13 +127,44 @@
       {{ form.flushing_end }}
     </div>
     <div class="field-group">
-      <label class="field-label">Borehole inspection result</label>
+      <label class="field-label">Borehole inspection</label>
       {{ form.inspection_collapse }}
     </div>
   </div>
 
   <div class="card">
     <div class="card-title">Concreting</div>
+
+    <div class="field-group">
+      <label class="field-label">Projection above ground (m)</label>
+      {{ form.projection_above_ground_m }}
+      <div class="field-hint">Additional concrete cast above cutoff level. Enter 0 if none.</div>
+    </div>
+
+    <!-- Live concrete volume panel -->
+    <div class="calc-box" style="margin-bottom:14px;">
+      <div class="calc-row">
+        <span class="calc-label">Pile depth</span>
+        <span class="calc-value" id="v-depth">{{ pile.actual_depth_from_casing_m|default:pile.design_depth_m }} m</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Projection</span>
+        <span class="calc-value" id="v-proj">0.0 m</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Effective depth</span>
+        <span class="calc-value" id="v-eff">{{ pile.actual_depth_from_casing_m|default:pile.design_depth_m }} m</span>
+      </div>
+      <div style="height:1px;background:rgba(59,130,246,.2);margin:8px 0;"></div>
+      <div class="calc-row">
+        <span class="calc-label">Theoretical volume</span>
+        <span class="calc-value" id="v-theo" style="color:#60a5fa;">{{ theoretical_volume }} m³</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Volume deviation</span>
+        <span class="calc-value" id="v-dev">Enter actual below</span>
+      </div>
+    </div>
 
     <div class="field-group">
       <label class="field-label">Casting — start</label>
@@ -93,10 +179,6 @@
     <div class="field-group">
       <label class="field-label">Actual concrete poured (m³)</label>
       {{ form.actual_concrete_m3 }}
-      <div class="field-hint">
-        {% if theoretical_volume %}Target: {{ theoretical_volume }} m³{% endif %}
-      </div>
-      {% if form.actual_concrete_m3.errors %}<div class="field-error">{{ form.actual_concrete_m3.errors.0 }}</div>{% endif %}
     </div>
     <div class="field-group">
       <label class="field-label">Slump (mm)</label>
@@ -107,11 +189,9 @@
   <div class="card">
     <div class="card-title">Audit — rough sheet photo</div>
     <div class="field-hint" style="margin-bottom:12px">
-      Photograph your handwritten rough sheet. This is stored as audit proof
-      alongside the digital record.
+      Photograph your handwritten rough sheet. Stored as audit proof.
     </div>
     {{ form.rough_sheet_photo }}
-    {% if form.rough_sheet_photo.errors %}<div class="field-error">{{ form.rough_sheet_photo.errors.0 }}</div>{% endif %}
   </div>
 
   <div class="nav-buttons">
@@ -122,27 +202,133 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if theoretical_volume %}
 <script>
-  const THEO = {{ theoretical_volume }};
-  const LIMIT = {{ pile.project.volume_deviation_alert_pct }};
-  const display = document.getElementById('live-deviation');
-  const input = document.getElementById('id_actual_concrete_m3');
+  const DIAMETER    = {{ pile.pile_diameter_m }};
+  const PILE_DEPTH  = {{ pile.actual_depth_from_casing_m|default:pile.design_depth_m }};
+  const DEFAULT_LAP = {{ pile.project.default_lap_length_m }};
+  const DEFAULT_COV = {{ pile.project.default_concrete_cover_mm }};
+  const DEV_LIMIT   = {{ pile.project.volume_deviation_alert_pct }};
 
-  input && input.addEventListener('input', function() {
-    const actual = parseFloat(this.value);
-    if (isNaN(actual) || actual <= 0) {
-      display.textContent = 'Enter actual concrete below';
-      display.className = 'calc-value';
-      return;
+  function val(id) {
+    const el = document.getElementById(id);
+    return el ? parseFloat(el.value) || 0 : 0;
+  }
+
+  function getInput(name) {
+    const el = document.querySelector(`[name="${name}"]`);
+    return el ? parseFloat(el.value) || null : null;
+  }
+
+  function recalcRebar() {
+    const lap      = getInput('lap_length_m') || DEFAULT_LAP;
+    const cover    = getInput('concrete_cover_mm') || DEFAULT_COV;
+    const nBars    = getInput('main_bar_count');
+    const mainDia  = getInput('main_bar_dia_mm');
+    const stiffDia = getInput('stiffener_dia_mm');
+    const stiffSpc = getInput('stiffener_spacing_m');
+    const spirDia  = getInput('spiral_dia_mm');
+    const spirPch  = getInput('spiral_pitch_m');
+
+    const cageLen = +(PILE_DEPTH + lap).toFixed(2);
+    document.getElementById('c-cage').textContent = cageLen + ' m';
+
+    if (stiffSpc) {
+      const n = Math.floor(PILE_DEPTH / stiffSpc) + 1;
+      document.getElementById('c-stiff').textContent = n + ' rings @ ' + stiffSpc + 'm c/c';
+    } else {
+      document.getElementById('c-stiff').textContent = '— (enter spacing)';
     }
-    const dev = ((actual - THEO) / THEO) * 100;
-    const sign = dev >= 0 ? '+' : '';
-    const label = `${sign}${dev.toFixed(1)}%`;
-    const isAlert = Math.abs(dev) > LIMIT;
-    display.textContent = isAlert ? `⚠ ${label} — exceeds ±${LIMIT}%` : `${label} ✓`;
-    display.className = `calc-value ${isAlert ? 'alert' : 'ok'}`;
+
+    if (spirPch) {
+      const n = Math.floor(PILE_DEPTH / spirPch) + 1;
+      document.getElementById('c-spiral').textContent = n + ' turns @ ' + (spirPch * 1000).toFixed(0) + 'mm pitch';
+    } else {
+      document.getElementById('c-spiral').textContent = '— (enter pitch)';
+    }
+
+    // Weight
+    let weight = 0;
+    let canCalc = true;
+
+    if (nBars && mainDia && cageLen) {
+      const uw = mainDia * mainDia * 0.00617;
+      weight += nBars * cageLen * uw;
+    } else { canCalc = false; }
+
+    if (spirDia && spirPch) {
+      const coverM = cover / 1000;
+      const spirDiaM = spirDia / 1000;
+      const innerDia = DIAMETER - 2 * coverM - spirDiaM;
+      const circ = Math.PI * innerDia;
+      const nSpir = Math.floor(PILE_DEPTH / spirPch) + 1;
+      const uw = spirDia * spirDia * 0.00617;
+      weight += nSpir * circ * uw;
+    }
+
+    if (stiffDia && stiffSpc) {
+      const coverM = cover / 1000;
+      const stiffDiaM = stiffDia / 1000;
+      const innerDia = DIAMETER - 2 * coverM - stiffDiaM;
+      const circ = Math.PI * innerDia;
+      const nStiff = Math.floor(PILE_DEPTH / stiffSpc) + 1;
+      const uw = stiffDia * stiffDia * 0.00617;
+      weight += nStiff * circ * uw;
+    }
+
+    const wEl = document.getElementById('c-weight');
+    if (weight > 0) {
+      wEl.textContent = weight.toFixed(1) + ' kg';
+      wEl.style.color = '#60a5fa';
+    } else {
+      wEl.textContent = '— (fill rebar inputs)';
+      wEl.style.color = 'var(--muted, #94a3b8)';
+    }
+  }
+
+  function recalcVolume() {
+    const proj = getInput('projection_above_ground_m') || 0;
+    const effDepth = +(PILE_DEPTH + proj).toFixed(2);
+    const vol = +(Math.PI * Math.pow(DIAMETER / 2, 2) * effDepth).toFixed(2);
+
+    document.getElementById('v-proj').textContent = proj.toFixed(1) + ' m';
+    document.getElementById('v-eff').textContent  = effDepth.toFixed(2) + ' m';
+    document.getElementById('v-theo').textContent = vol + ' m³';
+
+    const actual = getInput('actual_concrete_m3');
+    const devEl  = document.getElementById('v-dev');
+    const actEl  = document.getElementById('id_actual_concrete_m3');
+
+    if (actual && actual > 0) {
+      const dev = ((actual - vol) / vol) * 100;
+      const sign = dev >= 0 ? '+' : '';
+      const isAlert = Math.abs(dev) > DEV_LIMIT;
+      devEl.textContent = `${sign}${dev.toFixed(1)}% ${isAlert ? '⚠ ALERT' : '✓'}`;
+      devEl.className   = 'calc-value ' + (isAlert ? 'alert' : 'ok');
+      if (actEl) actEl.style.borderColor = isAlert ? 'var(--danger, #dc2626)' : 'var(--ok, #16a34a)';
+    } else {
+      devEl.textContent = 'Enter actual volume below';
+      devEl.className   = 'calc-value';
+    }
+  }
+
+  // Attach listeners to all relevant inputs
+  const rebarFields = [
+    'main_bar_count','main_bar_dia_mm','stiffener_dia_mm','stiffener_spacing_m',
+    'spiral_dia_mm','spiral_pitch_m','lap_length_m','concrete_cover_mm'
+  ];
+  rebarFields.forEach(name => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) el.addEventListener('input', recalcRebar);
   });
+
+  const volFields = ['projection_above_ground_m','actual_concrete_m3'];
+  volFields.forEach(name => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) el.addEventListener('input', recalcVolume);
+  });
+
+  // Run on load if pile already has data
+  recalcRebar();
+  recalcVolume();
 </script>
-{% endif %}
 {% endblock %}

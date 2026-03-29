@@ -49,7 +49,6 @@
     <button type="button" class="btn-add" onclick="addRow()">+ Add pipe segment</button>
   </div>
 
-  <!-- Live calculation display -->
   <div class="calc-box">
     <div class="calc-row">
       <span class="calc-label">Total tremie depth</span>
@@ -79,9 +78,10 @@
 
 {% block extra_js %}
 <script>
-  const DIAMETER = {{ pile.pile_diameter_m }};
-  const TOTAL_FORMS_INPUT = document.querySelector('[name="{{ formset.management_form.prefix }}-TOTAL_FORMS"]');
-  let rowCount = {{ formset.total_form_count }};
+  const DIAMETER   = {{ pile.pile_diameter_m }};
+  const PREFIX     = "{{ tremie }}";   // "tremie" — set in view
+  const MGMT_INPUT = document.querySelector('[name="' + PREFIX + '-TOTAL_FORMS"]');
+  let rowCount     = {{ formset.total_form_count }};
 
   function getLengths() {
     return Array.from(document.querySelectorAll('.field-tremie-length'))
@@ -91,9 +91,8 @@
 
   function recalc() {
     const lengths = getLengths();
-    const total = lengths.reduce((a, b) => a + b, 0);
-    const volume = Math.PI * Math.pow(DIAMETER / 2, 2) * total;
-
+    const total   = lengths.reduce((a, b) => a + b, 0);
+    const volume  = Math.PI * Math.pow(DIAMETER / 2, 2) * total;
     document.getElementById('total-depth').textContent =
       lengths.length ? total.toFixed(2) + ' m' : '—';
     document.getElementById('theo-volume').textContent =
@@ -102,40 +101,37 @@
 
   function addRow() {
     const container = document.getElementById('tremie-rows');
-    const newIndex = rowCount;
-    const seqNo = container.querySelectorAll('.tremie-row').length + 1;
+    const newIndex  = rowCount;
+    const seqNo     = container.querySelectorAll('.tremie-row').length + 1;
 
     const row = document.createElement('div');
     row.className = 'tremie-row';
     row.innerHTML = `
       <div class="tremie-seq">${seqNo}</div>
       <input type="number"
-        name="tremie_sequences-${newIndex}-length_m"
+        name="${PREFIX}-${newIndex}-length_m"
         class="field-input field-tremie-length"
         step="0.1" min="0.1" placeholder="e.g. 3.3"
         oninput="recalc()">
-      <input type="hidden" name="tremie_sequences-${newIndex}-sequence_no" value="${seqNo}">
-      <input type="hidden" name="tremie_sequences-${newIndex}-id" value="">
+      <input type="hidden" name="${PREFIX}-${newIndex}-sequence_no" value="${seqNo}">
+      <input type="hidden" name="${PREFIX}-${newIndex}-id" value="">
       <button type="button" class="tremie-del" onclick="removeRow(this)" aria-label="Remove">✕</button>
     `;
     container.appendChild(row);
     rowCount++;
-    TOTAL_FORMS_INPUT.value = rowCount;
+    MGMT_INPUT.value = rowCount;
     row.querySelector('.field-tremie-length').focus();
     recalc();
   }
 
   function removeRow(btn) {
-    const row = btn.closest('.tremie-row');
-    row.remove();
-    // Re-number remaining rows
+    btn.closest('.tremie-row').remove();
     document.querySelectorAll('.tremie-row').forEach((r, i) => {
       r.querySelector('.tremie-seq').textContent = i + 1;
     });
     recalc();
   }
 
-  // Run on load to populate from existing saved data
   recalc();
 </script>
 {% endblock %}

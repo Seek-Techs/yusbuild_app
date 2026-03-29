@@ -106,14 +106,14 @@
 
   // Dynamic slurry form addition (simple — mirrors formset prefix pattern)
   let slurryCount = {{ formset.total_form_count }};
-  const PREFIX = 'slurry_checks';
+  const PREFIX = '{{ slurry }}';
   const mgmt = document.querySelector(`[name="${PREFIX}-TOTAL_FORMS"]`);
 
   function addSlurryForm() {
     // Clone last form card and increment indices
     const cards = document.querySelectorAll('.card');
     const lastCard = Array.from(cards).filter(c =>
-      c.querySelector('[name^="slurry_checks"]')
+      c.querySelector('[name^="' + PREFIX + '"]')
     ).pop();
     if (!lastCard) return;
 

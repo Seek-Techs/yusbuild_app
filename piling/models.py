@@ -7,13 +7,14 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 class PilingProject(models.Model):
     """
     One project = one site contract (e.g. Dangote Fertiliser FZE).
-    Spec thresholds are configured here, not hardcoded.
+    Spec thresholds and reinforcement defaults are configured here.
     """
     name = models.CharField(max_length=200)
     client = models.CharField(max_length=200)
     location = models.CharField(max_length=200, blank=True)
     concrete_grade = models.CharField(max_length=20, default="C35/45")
-    # Slurry spec limits (project-specific)
+
+    # Slurry spec limits
     sand_content_limit_pct = models.FloatField(
         default=5.0,
         help_text="Max sand content % allowed before concreting"
@@ -22,11 +23,23 @@ class PilingProject(models.Model):
     viscosity_max_secs = models.FloatField(default=90.0)
     density_min = models.FloatField(default=1.01)
     density_max = models.FloatField(default=1.25)
-    # Volume deviation alert threshold
+
+    # Volume deviation alert
     volume_deviation_alert_pct = models.FloatField(
         default=15.0,
         help_text="Flag if actual concrete deviates from theoretical by this %"
     )
+
+    # Reinforcement defaults — can be overridden per pile
+    default_lap_length_m = models.FloatField(
+        default=1.6,
+        help_text="Lap length above cutoff level (m). Default 1.6m."
+    )
+    default_concrete_cover_mm = models.FloatField(
+        default=75.0,
+        help_text="Concrete cover to reinforcement (mm). Typical 75mm for piles."
+    )
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -39,9 +52,9 @@ class PilingProject(models.Model):
 
 class Pile(models.Model):
     """
-    One record per bored pile. Timestamps drive audit trail.
-    Calculated fields (theoretical volume, deviation) are properties,
-    never stored — single source of truth is the inputs.
+    One record per bored pile.
+    All calculated quantities are @property — never stored.
+    Single source of truth is always the raw inputs.
     """
     PILE_TYPE_CHOICES = [
         ("test", "Test Pile"),
@@ -52,7 +65,7 @@ class Pile(models.Model):
     project = models.ForeignKey(
         PilingProject, on_delete=models.PROTECT, related_name="piles"
     )
-    pile_no = models.CharField(max_length=50)           # e.g. "Test Pile No. I"
+    pile_no = models.CharField(max_length=50)
     pile_type = models.CharField(
         max_length=20, choices=PILE_TYPE_CHOICES, default="working"
     )
@@ -63,10 +76,7 @@ class Pile(models.Model):
         validators=[MinValueValidator(1.0)],
         help_text="Design total depth from ground level (m)"
     )
-    location_description = models.CharField(
-        max_length=200, blank=True,
-        help_text="e.g. B2 Area North, Grid C3"
-    )
+    location_description = models.CharField(max_length=200, blank=True)
     rig_no = models.CharField(max_length=20, blank=True)
     drawing_number = models.CharField(max_length=100, blank=True)
     pile_coordinate = models.CharField(max_length=100, blank=True)
@@ -79,23 +89,66 @@ class Pile(models.Model):
     # Drilling
     drilling_start = models.DateTimeField(null=True, blank=True)
     drilling_end = models.DateTimeField(null=True, blank=True)
-    actual_depth_from_casing_m = models.FloatField(null=True, blank=True)
+    actual_depth_from_casing_m = models.FloatField(
+        null=True, blank=True,
+        help_text="Measured actual pile depth from casing top (m)"
+    )
 
-    # Rebar cage
+    # ------------------------------------------------------------------ #
+    # Reinforcement cage inputs                                            #
+    # ------------------------------------------------------------------ #
     rebar_lowering_start = models.DateTimeField(null=True, blank=True)
     rebar_lowering_end = models.DateTimeField(null=True, blank=True)
     cover_blocks_fixed = models.BooleanField(default=False)
-    main_bars_spec = models.CharField(
-        max_length=50, blank=True, help_text="e.g. 32mm"
+
+    # Main bars
+    main_bar_count = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Number of main longitudinal bars (e.g. 12)"
     )
-    stiffener_spec = models.CharField(
-        max_length=50, blank=True, help_text="e.g. 2.25m spacing"
-    )
-    spiral_bars_spec = models.CharField(
-        max_length=50, blank=True, help_text="e.g. 260mm @ 1/c"
+    main_bar_dia_mm = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(6.0), MaxValueValidator(50.0)],
+        help_text="Main bar diameter in mm (e.g. 32)"
     )
 
-    # Flushing (cleaning before concreting)
+    # Stiffener rings
+    stiffener_dia_mm = models.FloatField(
+        null=True, blank=True,
+        help_text="Stiffener ring bar diameter in mm (e.g. 16)"
+    )
+    stiffener_spacing_m = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.1)],
+        help_text="Stiffener ring centre-to-centre spacing (m)"
+    )
+
+    # Spiral / helix
+    spiral_dia_mm = models.FloatField(
+        null=True, blank=True,
+        help_text="Spiral bar diameter in mm (e.g. 10)"
+    )
+    spiral_pitch_m = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.05)],
+        help_text="Spiral ring centre-to-centre pitch (m)"
+    )
+
+    # Lap length — defaults to project setting, can be overridden per pile
+    lap_length_m = models.FloatField(
+        null=True, blank=True,
+        help_text="Lap length above cutoff level (m). Leave blank to use project default (1.6m)."
+    )
+
+    # Concrete cover — defaults to project setting
+    concrete_cover_mm = models.FloatField(
+        null=True, blank=True,
+        help_text="Concrete cover to reinforcement (mm). Leave blank for project default."
+    )
+
+    # ------------------------------------------------------------------ #
+    # Flushing & inspection                                                #
+    # ------------------------------------------------------------------ #
     flushing_start = models.DateTimeField(null=True, blank=True)
     flushing_end = models.DateTimeField(null=True, blank=True)
     inspection_collapse = models.BooleanField(
@@ -103,11 +156,19 @@ class Pile(models.Model):
         help_text="True=Collapse detected, False=No collapse"
     )
 
-    # Concreting
+    # ------------------------------------------------------------------ #
+    # Concreting                                                           #
+    # ------------------------------------------------------------------ #
     casting_start = models.DateTimeField(null=True, blank=True)
     casting_end = models.DateTimeField(null=True, blank=True)
     actual_concrete_m3 = models.FloatField(null=True, blank=True)
     concrete_slump_mm = models.IntegerField(null=True, blank=True)
+
+    # Projection above ground — optional, added to volume calc
+    projection_above_ground_m = models.FloatField(
+        null=True, blank=True, default=0.0,
+        help_text="Length cast above ground / cutoff level (m). Default 0."
+    )
 
     # Audit
     rough_sheet_photo = models.ImageField(
@@ -120,22 +181,44 @@ class Pile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # ------------------------------------------------------------------ #
-    # Calculated properties — never stored, always derived from inputs    #
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
+    # CALCULATED PROPERTIES — derived only, never stored                  #
+    # ================================================================== #
+
+    # -- Helpers -------------------------------------------------------- #
 
     @property
-    def tremie_total_depth_m(self):
-        lengths = list(
-            self.tremie_sequences.values_list("length_m", flat=True)
-        )
-        return round(sum(lengths), 3) if lengths else None
+    def _effective_depth(self):
+        """Actual pile depth used for all calculations."""
+        return self.actual_depth_from_casing_m or self.design_depth_m
+
+    @property
+    def _lap(self):
+        """Resolved lap length — pile override or project default."""
+        if self.lap_length_m is not None:
+            return self.lap_length_m
+        return self.project.default_lap_length_m
+
+    @property
+    def _cover(self):
+        """Resolved concrete cover in mm."""
+        if self.concrete_cover_mm is not None:
+            return self.concrete_cover_mm
+        return self.project.default_concrete_cover_mm
+
+    @property
+    def _projection(self):
+        return self.projection_above_ground_m or 0.0
+
+    # -- Concrete volume ------------------------------------------------ #
 
     @property
     def theoretical_volume_m3(self):
-        depth = self.tremie_total_depth_m
-        if depth is None:
-            return None
+        """
+        V = π × r² × (pile_depth + projection)
+        Uses actual depth if recorded, falls back to design depth.
+        """
+        depth = self._effective_depth + self._projection
         radius = self.pile_diameter_m / 2
         return round(math.pi * radius ** 2 * depth, 2)
 
@@ -143,9 +226,7 @@ class Pile(models.Model):
     def volume_deviation_pct(self):
         if self.actual_concrete_m3 and self.theoretical_volume_m3:
             theo = self.theoretical_volume_m3
-            return round(
-                ((self.actual_concrete_m3 - theo) / theo) * 100, 1
-            )
+            return round(((self.actual_concrete_m3 - theo) / theo) * 100, 1)
         return None
 
     @property
@@ -153,16 +234,136 @@ class Pile(models.Model):
         dev = self.volume_deviation_pct
         if dev is None:
             return "unknown"
-        threshold = self.project.volume_deviation_alert_pct
-        if abs(dev) > threshold:
-            return "alert"
-        return "ok"
+        return "alert" if abs(dev) > self.project.volume_deviation_alert_pct else "ok"
+
+    # -- Tremie tracking (assembly reference only) ---------------------- #
+
+    @property
+    def tremie_total_depth_m(self):
+        lengths = list(self.tremie_sequences.values_list("length_m", flat=True))
+        return round(sum(lengths), 3) if lengths else None
+
+    # -- Rebar cage ----------------------------------------------------- #
+
+    @property
+    def cage_length_m(self):
+        """
+        cage_length = pile_depth + lap_length_above_cutoff
+        The cage extends from the pile toe to lap_length above cutoff level.
+        """
+        return round(self._effective_depth + self._lap, 2)
+
+    @property
+    def n_stiffener_rings(self):
+        """
+        Number of stiffener rings = floor(pile_depth / spacing) + 1
+        +1 because you have one at the top and one at the bottom.
+        """
+        if not self.stiffener_spacing_m:
+            return None
+        return math.floor(self._effective_depth / self.stiffener_spacing_m) + 1
+
+    @property
+    def n_spiral_rings(self):
+        """Number of spiral ring turns = floor(pile_depth / pitch) + 1"""
+        if not self.spiral_pitch_m:
+            return None
+        return math.floor(self._effective_depth / self.spiral_pitch_m) + 1
+
+    @property
+    def spiral_ring_circumference_m(self):
+        """
+        Mean circumference of one spiral turn:
+        C = π × (pile_dia - 2×cover - spiral_bar_dia)
+        Cover and bar dia in metres for consistency.
+        """
+        if not self.spiral_dia_mm:
+            return None
+        inner_dia = (
+            self.pile_diameter_m
+            - 2 * (self._cover / 1000)
+            - (self.spiral_dia_mm / 1000)
+        )
+        return round(math.pi * inner_dia, 3)
+
+    @property
+    def total_spiral_length_m(self):
+        n = self.n_spiral_rings
+        circ = self.spiral_ring_circumference_m
+        if n is None or circ is None:
+            return None
+        return round(n * circ, 2)
+
+    @property
+    def rebar_unit_weight_kg_per_m(self):
+        """
+        Standard steel weight formula:
+        w (kg/m) = d² × 0.00617   where d is diameter in mm
+        Applies to main bars — spiral uses same formula with spiral_dia.
+        """
+        if not self.main_bar_dia_mm:
+            return None
+        return round(self.main_bar_dia_mm ** 2 * 0.00617, 4)
+
+    @property
+    def spiral_unit_weight_kg_per_m(self):
+        if not self.spiral_dia_mm:
+            return None
+        return round(self.spiral_dia_mm ** 2 * 0.00617, 4)
+
+    @property
+    def total_main_bar_length_m(self):
+        if not self.main_bar_count:
+            return None
+        return round(self.main_bar_count * self.cage_length_m, 2)
+
+    @property
+    def total_rebar_weight_kg(self):
+        """
+        Total steel weight = (main bars + spirals) in kg.
+        Stiffener rings use stiffener_dia for unit weight.
+        """
+        weight = 0.0
+        missing = []
+
+        # Main bars
+        main_len = self.total_main_bar_length_m
+        main_uw = self.rebar_unit_weight_kg_per_m
+        if main_len and main_uw:
+            weight += main_len * main_uw
+        else:
+            missing.append("main bars")
+
+        # Spiral
+        spiral_len = self.total_spiral_length_m
+        spiral_uw = self.spiral_unit_weight_kg_per_m
+        if spiral_len and spiral_uw:
+            weight += spiral_len * spiral_uw
+        else:
+            missing.append("spiral")
+
+        # Stiffener rings (circumference same formula as spiral)
+        if self.stiffener_dia_mm and self.n_stiffener_rings:
+            stiff_circ = math.pi * (
+                self.pile_diameter_m
+                - 2 * (self._cover / 1000)
+                - (self.stiffener_dia_mm / 1000)
+            )
+            stiff_uw = self.stiffener_dia_mm ** 2 * 0.00617
+            weight += self.n_stiffener_rings * stiff_circ * stiff_uw
+
+        if not weight:
+            return None
+        return round(weight, 1)
+
+    # -- Time tracking -------------------------------------------------- #
 
     @property
     def drilling_duration_hours(self):
         if self.drilling_start and self.drilling_end:
-            delta = self.drilling_end - self.drilling_start
-            return round(delta.total_seconds() / 3600, 2)
+            return round(
+                (self.drilling_end - self.drilling_start).total_seconds() / 3600, 2
+            )
         return None
 
     def __str__(self):
@@ -174,10 +375,7 @@ class Pile(models.Model):
 
 
 class TremieSequence(models.Model):
-    """
-    Each row = one pipe segment lowered during tremie pipe assembly.
-    Sequence order matters — sequence_no drives the display order.
-    """
+    """Tremie pipe assembly log — reference only, not used for volume."""
     pile = models.ForeignKey(
         Pile, on_delete=models.CASCADE, related_name="tremie_sequences"
     )
@@ -195,10 +393,6 @@ class TremieSequence(models.Model):
 
 
 class SlurryCheck(models.Model):
-    """
-    Bentonite slurry QC readings. Min two per pile: initial + final pre-cast.
-    QC flags are computed against project spec — no hardcoding.
-    """
     STAGE_CHOICES = [
         ("initial", "Initial (pre-drilling)"),
         ("final", "Final (pre-concreting)"),
@@ -209,21 +403,14 @@ class SlurryCheck(models.Model):
     )
     stage = models.CharField(max_length=10, choices=STAGE_CHOICES)
     checked_at = models.DateTimeField()
-    viscosity_secs = models.FloatField(
-        help_text="Marsh funnel viscosity in seconds"
-    )
+    viscosity_secs = models.FloatField()
     specific_gravity = models.FloatField(
-        validators=[MinValueValidator(0.9), MaxValueValidator(2.0)],
-        help_text="Density / specific gravity reading"
+        validators=[MinValueValidator(0.9), MaxValueValidator(2.0)]
     )
     sand_content_pct = models.FloatField(
         validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
     )
     ph_value = models.FloatField(null=True, blank=True)
-
-    # ------------------------------------------------------------------ #
-    # QC flags — always checked against project spec                      #
-    # ------------------------------------------------------------------ #
 
     @property
     def sand_content_ok(self):
@@ -231,13 +418,13 @@ class SlurryCheck(models.Model):
 
     @property
     def viscosity_ok(self):
-        spec = self.pile.project
-        return spec.viscosity_min_secs <= self.viscosity_secs <= spec.viscosity_max_secs
+        s = self.pile.project
+        return s.viscosity_min_secs <= self.viscosity_secs <= s.viscosity_max_secs
 
     @property
     def density_ok(self):
-        spec = self.pile.project
-        return spec.density_min <= self.specific_gravity <= spec.density_max
+        s = self.pile.project
+        return s.density_min <= self.specific_gravity <= s.density_max
 
     @property
     def all_ok(self):
@@ -262,10 +449,6 @@ class SlurryCheck(models.Model):
 
 
 class SoilLayer(models.Model):
-    """
-    Soil texture log. Depth intervals from the rough sheet annotations.
-    Used to render the borehole log visual.
-    """
     TEXTURE_CHOICES = [
         ("normal_sand", "Normal sand"),
         ("slightly_mud", "Slightly mud"),

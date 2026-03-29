@@ -95,7 +95,7 @@
     {% endfor %}
   ];
 
-  const PREFIX = 'soillayer_set';
+  const PREFIX = '{{ soil }}';
   const mgmt   = document.querySelector(`[name="${PREFIX}-TOTAL_FORMS"]`);
   let soilCount = {{ formset.total_form_count }};
 
