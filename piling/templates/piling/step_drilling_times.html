@@ -1,0 +1,102 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Drilling Times — YusBuild{% endblock %}
+
+{% block content %}
+<div class="page-title">Drilling times</div>
+<div class="page-subtitle">Step 2 of 6 — Casing and drilling windows</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Casing installation</div>
+
+    <div class="field-group">
+      <label class="field-label">Top of casing (m)</label>
+      {{ form.top_of_casing_m }}
+      <div class="field-hint">Measured from ground surface</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Casing install — start</label>
+      {{ form.casing_installation_start }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Casing install — end</label>
+      {{ form.casing_installation_end }}
+      {% if form.casing_installation_end.errors %}
+        <div class="field-error">{{ form.casing_installation_end.errors.0 }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Rotary drilling</div>
+
+    <div class="field-group">
+      <label class="field-label">Drilling — start</label>
+      {{ form.drilling_start }}
+      {% if form.drilling_start.errors %}
+        <div class="field-error">{{ form.drilling_start.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Drilling — end</label>
+      {{ form.drilling_end }}
+      {% if form.drilling_end.errors %}
+        <div class="field-error">{{ form.drilling_end.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Actual depth from casing (m)</label>
+      {{ form.actual_depth_from_casing_m }}
+      <div class="field-hint">Design depth: {{ pile.design_depth_m }}m</div>
+      {% if form.actual_depth_from_casing_m.errors %}
+        <div class="field-error">{{ form.actual_depth_from_casing_m.errors.0 }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Live duration display -->
+  <div class="calc-box" id="duration-box" style="display:none">
+    <div class="calc-row">
+      <span class="calc-label">Drilling duration</span>
+      <span class="calc-value" id="duration-display">—</span>
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <a href="{% url 'piling:step_pile_info' pile.pk %}" class="btn btn-secondary">← Back</a>
+    <button type="submit" class="btn btn-primary">Save & next →</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const startInput = document.querySelector('[name="drilling_start"]');
+  const endInput   = document.querySelector('[name="drilling_end"]');
+  const box        = document.getElementById('duration-box');
+  const display    = document.getElementById('duration-display');
+
+  function updateDuration() {
+    const s = new Date(startInput.value);
+    const e = new Date(endInput.value);
+    if (!isNaN(s) && !isNaN(e) && e > s) {
+      const hrs = ((e - s) / 3600000).toFixed(2);
+      display.textContent = hrs + ' hrs';
+      box.style.display = 'block';
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  startInput && startInput.addEventListener('change', updateDuration);
+  endInput   && endInput.addEventListener('change', updateDuration);
+</script>
+{% endblock %}

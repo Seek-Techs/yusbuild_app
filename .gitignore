@@ -27,3 +27,7 @@ staticfiles/
 Thumbs.db
 
 env.template
+
+INTEGRATION.md
+requirements_piling.txt
+settings_snippet.py

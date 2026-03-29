@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Sign in — YusBuild Piling</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f1a; --surface: #1a1a2e; --border: #2e2e4a;
+      --accent: #3b82f6; --text: #f1f5f9; --muted: #94a3b8;
+      --danger: #dc2626; --radius: 12px;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+    }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px 24px;
+      width: 100%; max-width: 380px;
+    }
+    .logo {
+      font-size: 22px; font-weight: 700; color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .tagline { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    .field-group { margin-bottom: 18px; }
+    label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; font-weight: 500; }
+    input[type="text"], input[type="password"] {
+      width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 16px;
+      padding: 13px 14px; outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus { border-color: var(--accent); }
+    .btn {
+      width: 100%; padding: 15px; border-radius: 8px; border: none;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      background: var(--accent); color: #fff; margin-top: 8px;
+    }
+    .btn:active { opacity: 0.85; }
+    .error {
+      background: rgba(220,38,38,0.12); color: #f87171;
+      border-radius: 8px; padding: 11px 14px; font-size: 13px; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo">⛏ YusBuild</div>
+    <div class="tagline">Bored piling field logger</div>
+
+    {% if form.errors %}
+    <div class="error">Invalid username or password. Try again.</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="field-group">
+        <label for="id_username">Username</label>
+        <input type="text" name="username" id="id_username"
+               autocomplete="username" autocapitalize="none" autofocus>
+      </div>
+      <div class="field-group">
+        <label for="id_password">Password</label>
+        <input type="password" name="password" id="id_password"
+               autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,408 @@
+{% load piling_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>{% block title %}YusBuild Piling{% endblock %}</title>
+  <style>
+    /* ── Reset & tokens ───────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f0f1a;
+      --surface:  #1a1a2e;
+      --border:   #2e2e4a;
+      --accent:   #3b82f6;
+      --accent-dk:#2563eb;
+      --success:  #16a34a;
+      --warning:  #d97706;
+      --danger:   #dc2626;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --label:    #cbd5e1;
+      --input-bg: #0f0f1a;
+      --radius:   12px;
+      --radius-sm:8px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────── */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .app-header .logo {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .app-header .pile-id {
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    /* ── Progress stepper ─────────────────────────── */
+    .stepper {
+      display: flex;
+      overflow-x: auto;
+      gap: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 4px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .stepper::-webkit-scrollbar { display: none; }
+
+    .stepper-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 10px 8px;
+      min-width: 56px;
+      font-size: 10px;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-decoration: none;
+    }
+    .stepper-step .dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .stepper-step.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .stepper-step.active .dot { background: var(--accent); color: #fff; }
+    .stepper-step.done { color: var(--success); }
+    .stepper-step.done .dot { background: var(--success); color: #fff; }
+
+    /* ── Page content ─────────────────────────────── */
+    .page { padding: 16px; max-width: 560px; margin: 0 auto; }
+
+    .page-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .page-subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* ── Cards ────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Form fields ──────────────────────────────── */
+    .field-group { margin-bottom: 16px; }
+    .field-label {
+      display: block;
+      font-size: 13px;
+      color: var(--label);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .field-input,
+    .field-datetime {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 16px;        /* 16px prevents iOS zoom on focus */
+      padding: 13px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .field-input:focus,
+    .field-datetime:focus {
+      border-color: var(--accent);
+    }
+    select.field-input {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    .field-checkbox {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .field-file {
+      width: 100%;
+      font-size: 14px;
+      color: var(--muted);
+      padding: 10px 0;
+    }
+
+    .field-error {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 5px;
+    }
+    .field-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Inline row (label + checkbox) ────────────── */
+    .field-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ── Spec badge ───────────────────────────────── */
+    .spec-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      background: rgba(59,130,246,0.12);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 3px 8px;
+      margin-bottom: 8px;
+    }
+
+    /* ── QC flag badge ────────────────────────────── */
+    .badge-ok      { background: rgba(22,163,74,0.15);  color: #4ade80; border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+    .badge-alert   { background: rgba(220,38,38,0.15);  color: #f87171; border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+    .badge-unknown { background: rgba(148,163,184,0.1); color: var(--muted); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+
+    /* ── Tremie row ───────────────────────────────── */
+    .tremie-row {
+      display: grid;
+      grid-template-columns: 36px 1fr 36px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .tremie-seq {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      font-weight: 600;
+    }
+    .tremie-del {
+      background: none;
+      border: none;
+      color: var(--danger);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+
+    /* ── Live calculation display ─────────────────── */
+    .calc-box {
+      background: rgba(59,130,246,0.08);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .calc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      padding: 4px 0;
+    }
+    .calc-label { color: var(--muted); }
+    .calc-value { font-weight: 600; color: var(--text); }
+    .calc-value.alert { color: var(--danger); }
+    .calc-value.ok    { color: #4ade80; }
+
+    /* ── Soil log strip ───────────────────────────── */
+    .soil-strip {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+    .soil-depth-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      flex: 0 0 180px;
+    }
+    .soil-texture-col { flex: 1; }
+    .soil-notes-col   { flex: 1; }
+
+    /* ── Navigation buttons ───────────────────────── */
+    .nav-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      padding-bottom: 32px;
+    }
+    .btn {
+      flex: 1;
+      padding: 15px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn:active { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dk); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+    .btn-add {
+      width: 100%;
+      background: rgba(59,130,246,0.1);
+      color: var(--accent);
+      border: 1.5px dashed rgba(59,130,246,0.35);
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .btn-add:hover { background: rgba(59,130,246,0.18); }
+
+    /* ── Messages ─────────────────────────────────── */
+    .messages { padding: 0 16px; max-width: 560px; margin: 12px auto 0; }
+    .message {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .message-success { background: rgba(22,163,74,0.15);  color: #4ade80; }
+    .message-error   { background: rgba(220,38,38,0.15);  color: #f87171; }
+    .message-warning { background: rgba(217,119,6,0.15);  color: #fbbf24; }
+
+    /* ── Review table ─────────────────────────────── */
+    .review-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .review-table td { padding: 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .review-table td:first-child { color: var(--muted); width: 45%; padding-right: 12px; }
+    .review-table td:last-child { font-weight: 500; }
+
+    /* ── Divider ──────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    /* ── Formset hidden management ────────────────── */
+    .formset-management { display: none; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<header class="app-header">
+  <a href="{% url 'piling:dashboard' %}" class="logo">⛏ YusBuild Piling</a>
+  {% if pile %}
+    <span class="pile-id">{{ pile.pile_no }}</span>
+  {% endif %}
+</header>
+
+{% if messages %}
+<div class="messages">
+  {% for message in messages %}
+    <div class="message message-{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% block stepper %}
+{% if steps %}
+<nav class="stepper" id="stepper">
+  {% for step_key in steps %}
+    {% with label=step_labels|get_item:step_key %}
+    <div class="stepper-step
+      {% if step_key == current_step %}active
+      {% elif steps|index:step_key < steps|index:current_step %}done
+      {% endif %}">
+      <div class="dot">{{ forloop.counter }}</div>
+      {{ label }}
+    </div>
+    {% endwith %}
+  {% endfor %}
+</nav>
+{% endif %}
+{% endblock %}
+
+<main class="page">
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+  // Auto-scroll stepper to active step
+  const stepper = document.getElementById('stepper');
+  if (stepper) {
+    const active = stepper.querySelector('.active');
+    if (active) {
+      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

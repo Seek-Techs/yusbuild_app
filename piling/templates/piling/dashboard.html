@@ -1,0 +1,83 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Dashboard — YusBuild Piling{% endblock %}
+{% block stepper %}{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+  <div>
+    <div class="page-title">Piling log</div>
+    <div class="page-subtitle">{{ request.user.get_full_name|default:request.user.username }}</div>
+  </div>
+  <a href="{% url 'piling:step_pile_info_new' %}" class="btn btn-primary" style="flex:none;padding:12px 18px;font-size:14px">+ New pile</a>
+</div>
+
+{% if projects %}
+{% for project in projects %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+    <div>
+      <div style="font-weight:600;font-size:15px">{{ project.name }}</div>
+      <div style="font-size:12px;color:var(--muted)">{{ project.client }} · {{ project.piles.count }} pile{{ project.piles.count|pluralize }}</div>
+    </div>
+  </div>
+
+  {% for pile in project.piles.all|slice:":10" %}
+  <a href="{% url 'piling:review' pile.pk %}"
+     style="display:flex;justify-content:space-between;align-items:center;
+            padding:10px 0;border-top:1px solid var(--border);
+            text-decoration:none;color:var(--text)">
+    <div>
+      <div style="font-size:14px;font-weight:500">{{ pile.pile_no }}</div>
+      <div style="font-size:12px;color:var(--muted)">{{ pile.location_description }}</div>
+    </div>
+    <div style="text-align:right">
+      {% with flag=pile.volume_flag %}
+      {% if flag == "ok" %}
+        <span class="badge-ok">{{ pile.volume_deviation_pct|default:"" }}%</span>
+      {% elif flag == "alert" %}
+        <span class="badge-alert">⚠ {{ pile.volume_deviation_pct }}%</span>
+      {% else %}
+        <span class="badge-unknown">draft</span>
+      {% endif %}
+      {% endwith %}
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">{{ pile.created_at|date:"d/m/Y" }}</div>
+    </div>
+  </a>
+  {% empty %}
+  <div style="font-size:13px;color:var(--muted);padding:8px 0">No piles recorded yet.</div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:40px 20px">
+  <div style="font-size:32px;margin-bottom:12px">⛏</div>
+  <div style="font-weight:600;margin-bottom:8px">No projects yet</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+    Create a project in the admin panel first, then log your first pile.
+  </div>
+  <a href="/admin/piling/pilingproject/add/" class="btn btn-primary" style="flex:none;display:inline-flex;width:auto;padding:12px 24px">
+    Create project in admin
+  </a>
+</div>
+{% endif %}
+
+{% if recent_piles %}
+<div class="card">
+  <div class="card-title">Recent activity</div>
+  {% for pile in recent_piles %}
+  <a href="{% url 'piling:review' pile.pk %}"
+     style="display:flex;justify-content:space-between;align-items:center;
+            padding:10px 0;{% if not forloop.last %}border-bottom:1px solid var(--border);{% endif %}
+            text-decoration:none;color:var(--text)">
+    <div>
+      <div style="font-size:14px">{{ pile.pile_no }}</div>
+      <div style="font-size:12px;color:var(--muted)">{{ pile.project.name }}</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted)">{{ pile.updated_at|timesince }} ago</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

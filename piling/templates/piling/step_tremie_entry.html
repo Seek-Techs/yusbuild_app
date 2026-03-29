@@ -1,0 +1,141 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Tremie Entry — YusBuild{% endblock %}
+
+{% block content %}
+<div class="page-title">Tremie pipe sequence</div>
+<div class="page-subtitle">Step 3 of 6 — Enter each pipe length as lowered</div>
+
+<form method="post" id="tremie-form" novalidate>
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <div class="card">
+    <div class="card-title">Pipe lengths (m)</div>
+    <div class="field-hint" style="margin-bottom:14px">
+      Enter pipe lengths in the order they were lowered.
+      Total is calculated automatically.
+    </div>
+
+    <div id="tremie-rows">
+      {% for form in formset %}
+        <div class="tremie-row">
+          <div class="tremie-seq">{{ forloop.counter }}</div>
+          {{ form.id }}
+          {{ form.sequence_no.as_hidden }}
+          <input
+            type="number"
+            name="{{ form.length_m.html_name }}"
+            value="{{ form.length_m.value|default:'' }}"
+            class="field-input field-tremie-length"
+            step="0.1"
+            min="0.1"
+            placeholder="e.g. 3.3"
+            oninput="recalc()"
+          >
+          {% if forloop.counter > 1 %}
+          <button type="button" class="tremie-del" onclick="removeRow(this)" aria-label="Remove">✕</button>
+          {% else %}
+          <div></div>
+          {% endif %}
+        </div>
+        {% if form.length_m.errors %}
+          <div class="field-error" style="margin-bottom:8px">{{ form.length_m.errors.0 }}</div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <button type="button" class="btn-add" onclick="addRow()">+ Add pipe segment</button>
+  </div>
+
+  <!-- Live calculation display -->
+  <div class="calc-box">
+    <div class="calc-row">
+      <span class="calc-label">Total tremie depth</span>
+      <span class="calc-value" id="total-depth">—</span>
+    </div>
+    <div class="calc-row">
+      <span class="calc-label">Pile diameter</span>
+      <span class="calc-value">{{ pile.pile_diameter_m }}m</span>
+    </div>
+    <div class="calc-row">
+      <span class="calc-label">Design depth</span>
+      <span class="calc-value">{{ pile.design_depth_m }}m</span>
+    </div>
+    <div style="height:1px;background:rgba(59,130,246,0.2);margin:10px 0;"></div>
+    <div class="calc-row">
+      <span class="calc-label">Theoretical concrete volume</span>
+      <span class="calc-value" id="theo-volume">—</span>
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <a href="{% url 'piling:step_drilling_times' pile.pk %}" class="btn btn-secondary">← Back</a>
+    <button type="submit" class="btn btn-primary">Save & next →</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const DIAMETER = {{ pile.pile_diameter_m }};
+  const TOTAL_FORMS_INPUT = document.querySelector('[name="{{ formset.management_form.prefix }}-TOTAL_FORMS"]');
+  let rowCount = {{ formset.total_form_count }};
+
+  function getLengths() {
+    return Array.from(document.querySelectorAll('.field-tremie-length'))
+      .map(el => parseFloat(el.value))
+      .filter(v => !isNaN(v) && v > 0);
+  }
+
+  function recalc() {
+    const lengths = getLengths();
+    const total = lengths.reduce((a, b) => a + b, 0);
+    const volume = Math.PI * Math.pow(DIAMETER / 2, 2) * total;
+
+    document.getElementById('total-depth').textContent =
+      lengths.length ? total.toFixed(2) + ' m' : '—';
+    document.getElementById('theo-volume').textContent =
+      lengths.length ? volume.toFixed(2) + ' m³' : '—';
+  }
+
+  function addRow() {
+    const container = document.getElementById('tremie-rows');
+    const newIndex = rowCount;
+    const seqNo = container.querySelectorAll('.tremie-row').length + 1;
+
+    const row = document.createElement('div');
+    row.className = 'tremie-row';
+    row.innerHTML = `
+      <div class="tremie-seq">${seqNo}</div>
+      <input type="number"
+        name="tremie_sequences-${newIndex}-length_m"
+        class="field-input field-tremie-length"
+        step="0.1" min="0.1" placeholder="e.g. 3.3"
+        oninput="recalc()">
+      <input type="hidden" name="tremie_sequences-${newIndex}-sequence_no" value="${seqNo}">
+      <input type="hidden" name="tremie_sequences-${newIndex}-id" value="">
+      <button type="button" class="tremie-del" onclick="removeRow(this)" aria-label="Remove">✕</button>
+    `;
+    container.appendChild(row);
+    rowCount++;
+    TOTAL_FORMS_INPUT.value = rowCount;
+    row.querySelector('.field-tremie-length').focus();
+    recalc();
+  }
+
+  function removeRow(btn) {
+    const row = btn.closest('.tremie-row');
+    row.remove();
+    // Re-number remaining rows
+    document.querySelectorAll('.tremie-row').forEach((r, i) => {
+      r.querySelector('.tremie-seq').textContent = i + 1;
+    });
+    recalc();
+  }
+
+  // Run on load to populate from existing saved data
+  recalc();
+</script>
+{% endblock %}

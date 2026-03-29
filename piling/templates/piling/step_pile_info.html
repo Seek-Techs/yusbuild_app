@@ -1,0 +1,87 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Pile Info — YusBuild{% endblock %}
+
+{% block content %}
+<div class="page-title">New pile record</div>
+<div class="page-subtitle">Step 1 of 6 — Basic identification</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Project & pile identity</div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.project.id_for_label }}">Project</label>
+      {{ form.project }}
+      {% if form.project.errors %}
+        <div class="field-error">{{ form.project.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.pile_no.id_for_label }}">Pile number</label>
+      {{ form.pile_no }}
+      {% if form.pile_no.errors %}
+        <div class="field-error">{{ form.pile_no.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.pile_type.id_for_label }}">Pile type</label>
+      {{ form.pile_type }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Dimensions</div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.pile_diameter_m.id_for_label }}">Pile diameter (m)</label>
+      {{ form.pile_diameter_m }}
+      <div class="field-hint">Common sizes: 0.6m, 0.8m, 1.0m, 1.2m, 1.5m</div>
+      {% if form.pile_diameter_m.errors %}
+        <div class="field-error">{{ form.pile_diameter_m.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.design_depth_m.id_for_label }}">Design depth (m)</label>
+      {{ form.design_depth_m }}
+      {% if form.design_depth_m.errors %}
+        <div class="field-error">{{ form.design_depth_m.errors.0 }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Location & references</div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.location_description.id_for_label }}">Location / grid ref</label>
+      {{ form.location_description }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.rig_no.id_for_label }}">Rig number</label>
+      {{ form.rig_no }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.drawing_number.id_for_label }}">Drawing number</label>
+      {{ form.drawing_number }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="{{ form.pile_coordinate.id_for_label }}">Pile coordinate</label>
+      {{ form.pile_coordinate }}
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <button type="submit" class="btn btn-primary">Save & next →</button>
+  </div>
+</form>
+{% endblock %}

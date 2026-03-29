@@ -1,0 +1,156 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Review — {{ pile.pile_no }}{% endblock %}
+
+{% block content %}
+<div class="page-title">{{ pile.pile_no }}</div>
+<div class="page-subtitle">{{ pile.project.name }} — {{ pile.location_description }}</div>
+
+<!-- Volume QC result — most important flag -->
+{% with dev=pile.volume_deviation_pct flag=pile.volume_flag theo=pile.theoretical_volume_m3 %}
+{% if theo %}
+<div class="card" style="
+  background: {% if flag == 'alert' %}rgba(220,38,38,0.1){% else %}rgba(22,163,74,0.08){% endif %};
+  border-color: {% if flag == 'alert' %}rgba(220,38,38,0.35){% else %}rgba(22,163,74,0.3){% endif %};
+">
+  <div class="card-title">Concrete volume check</div>
+  <div class="calc-row">
+    <span class="calc-label">Theoretical</span>
+    <span class="calc-value">{{ theo }} m³</span>
+  </div>
+  <div class="calc-row">
+    <span class="calc-label">Actual poured</span>
+    <span class="calc-value">{{ pile.actual_concrete_m3|default:"—" }} m³</span>
+  </div>
+  {% if dev is not None %}
+  <div class="calc-row">
+    <span class="calc-label">Deviation</span>
+    <span class="calc-value {% if flag == 'alert' %}alert{% else %}ok{% endif %}">
+      {% if dev >= 0 %}+{% endif %}{{ dev }}%
+      {% if flag == 'alert' %} ⚠ ALERT{% else %} ✓{% endif %}
+    </span>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Slurry QC -->
+{% if slurry_checks %}
+<div class="card">
+  <div class="card-title">Slurry QC</div>
+  {% for check in slurry_checks %}
+  <div style="margin-bottom:14px;padding-bottom:14px;{% if not forloop.last %}border-bottom:1px solid var(--border){% endif %}">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      {{ check.get_stage_display }}
+      <span class="{% if check.all_ok %}badge-ok{% else %}badge-alert{% endif %}">
+        {% if check.all_ok %}PASS{% else %}FAIL{% endif %}
+      </span>
+    </div>
+    <table class="review-table">
+      <tr>
+        <td>Viscosity</td>
+        <td>{{ check.viscosity_secs }} secs
+          <span class="{% if check.viscosity_ok %}badge-ok{% else %}badge-alert{% endif %}" style="margin-left:6px;font-size:11px">
+            {% if check.viscosity_ok %}ok{% else %}out of spec{% endif %}
+          </span>
+        </td>
+      </tr>
+      <tr>
+        <td>Specific gravity</td>
+        <td>{{ check.specific_gravity }}
+          <span class="{% if check.density_ok %}badge-ok{% else %}badge-alert{% endif %}" style="margin-left:6px;font-size:11px">
+            {% if check.density_ok %}ok{% else %}out of spec{% endif %}
+          </span>
+        </td>
+      </tr>
+      <tr>
+        <td>Sand content</td>
+        <td>{{ check.sand_content_pct }}%
+          <span class="{% if check.sand_content_ok %}badge-ok{% else %}badge-alert{% endif %}" style="margin-left:6px;font-size:11px">
+            {% if check.sand_content_ok %}ok{% else %}EXCEEDS LIMIT{% endif %}
+          </span>
+        </td>
+      </tr>
+      {% if check.ph_value %}
+      <tr><td>pH</td><td>{{ check.ph_value }}</td></tr>
+      {% endif %}
+    </table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Tremie sequence -->
+{% if tremie_sequences %}
+<div class="card">
+  <div class="card-title">Tremie sequence</div>
+  {% for t in tremie_sequences %}
+  <div style="display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--border)">
+    <span style="color:var(--muted)">Pipe #{{ t.sequence_no }}</span>
+    <span>{{ t.length_m }} m</span>
+  </div>
+  {% endfor %}
+  <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;padding:10px 0 0">
+    <span>Total depth</span>
+    <span>{{ pile.tremie_total_depth_m }} m</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Key times -->
+<div class="card">
+  <div class="card-title">Timeline</div>
+  <table class="review-table">
+    <tr><td>Drilling start</td><td>{{ pile.drilling_start|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+    <tr><td>Drilling end</td><td>{{ pile.drilling_end|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+    <tr><td>Drilling duration</td><td>{% if pile.drilling_duration_hours %}{{ pile.drilling_duration_hours }} hrs{% else %}—{% endif %}</td></tr>
+    <tr><td>Rebar lowering</td><td>{{ pile.rebar_lowering_start|date:"H:i"|default:"—" }} – {{ pile.rebar_lowering_end|date:"H:i"|default:"—" }}</td></tr>
+    <tr><td>Flushing</td><td>{{ pile.flushing_start|date:"H:i"|default:"—" }} – {{ pile.flushing_end|date:"H:i"|default:"—" }}</td></tr>
+    <tr><td>Casting start</td><td>{{ pile.casting_start|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+    <tr><td>Casting end</td><td>{{ pile.casting_end|date:"d/m/Y H:i"|default:"—" }}</td></tr>
+  </table>
+</div>
+
+<!-- Soil log -->
+{% if soil_layers %}
+<div class="card">
+  <div class="card-title">Soil log</div>
+  {% for layer in soil_layers %}
+  <div style="display:flex;gap:12px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
+    <span style="color:var(--muted);min-width:100px">{{ layer.depth_from_m }}m – {{ layer.depth_to_m }}m</span>
+    <span>{{ layer.get_texture_display }}</span>
+    {% if layer.notes %}<span style="color:var(--muted)">{{ layer.notes }}</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Rough sheet audit -->
+{% if pile.rough_sheet_photo %}
+<div class="card">
+  <div class="card-title">Audit — rough sheet</div>
+  <img src="{{ pile.rough_sheet_photo.url }}"
+       style="width:100%;border-radius:8px;border:1px solid var(--border)"
+       alt="Rough sheet photo">
+</div>
+{% endif %}
+
+<!-- Edit navigation -->
+<div class="card" style="background:rgba(59,130,246,0.05)">
+  <div class="card-title">Edit sections</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px">
+    <a href="{% url 'piling:step_pile_info' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Pile info</a>
+    <a href="{% url 'piling:step_drilling_times' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Drilling</a>
+    <a href="{% url 'piling:step_tremie_entry' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Tremie</a>
+    <a href="{% url 'piling:step_slurry_check' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Slurry</a>
+    <a href="{% url 'piling:step_soil_log' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Soil log</a>
+    <a href="{% url 'piling:step_concreting' pile.pk %}" class="btn btn-secondary" style="flex:none;padding:10px">Concreting</a>
+  </div>
+</div>
+
+<div class="nav-buttons">
+  <a href="{% url 'piling:dashboard' %}" class="btn btn-primary">← Dashboard</a>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Slurry Check — YusBuild{% endblock %}
+
+{% block content %}
+<div class="page-title">Bentonite slurry check</div>
+<div class="page-subtitle">Step 4 of 6 — Record initial and final readings</div>
+
+<!-- Project spec reference -->
+<div class="card" style="background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.2)">
+  <div class="card-title" style="color:var(--accent)">Project spec limits</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+    <div><span style="color:var(--muted)">Viscosity</span><br><strong>{{ spec.viscosity_min }}–{{ spec.viscosity_max }} secs</strong></div>
+    <div><span style="color:var(--muted)">Density (SG)</span><br><strong>{{ spec.density_min }}–{{ spec.density_max }}</strong></div>
+    <div><span style="color:var(--muted)">Sand content</span><br><strong>< {{ spec.sand_limit }}% before pour</strong></div>
+  </div>
+</div>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  {% for form in formset %}
+  <div class="card">
+    <div class="card-title">
+      {{ form.stage.value|default:"Reading" }} check
+      {% if forloop.counter == 1 %}— initial{% else %}— final (pre-cast){% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Stage</label>
+      {{ form.stage }}
+      {% if form.stage.errors %}<div class="field-error">{{ form.stage.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Time of check</label>
+      {{ form.checked_at }}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Viscosity (Marsh funnel, secs)</label>
+      <div class="spec-badge">spec: {{ spec.viscosity_min }}–{{ spec.viscosity_max }} secs</div>
+      {{ form.viscosity_secs }}
+      {% if form.viscosity_secs.errors %}<div class="field-error">{{ form.viscosity_secs.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Specific gravity / density</label>
+      <div class="spec-badge">spec: {{ spec.density_min }}–{{ spec.density_max }}</div>
+      {{ form.specific_gravity }}
+      {% if form.specific_gravity.errors %}<div class="field-error">{{ form.specific_gravity.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Sand content (%)</label>
+      <div class="spec-badge">spec: < {{ spec.sand_limit }}%</div>
+      {{ form.sand_content_pct }}
+      {% if form.sand_content_pct.errors %}<div class="field-error">{{ form.sand_content_pct.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">pH value (optional)</label>
+      {{ form.ph_value }}
+    </div>
+  </div>
+  {% endfor %}
+
+  <button type="button" class="btn-add" onclick="addSlurryForm()">+ Add another slurry check</button>
+
+  <div class="nav-buttons">
+    <a href="{% url 'piling:step_tremie_entry' pile.pk %}" class="btn btn-secondary">← Back</a>
+    <button type="submit" class="btn btn-primary">Save & next →</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Live inline QC flag — colours the field border as user types
+  const SPEC = {
+    vMin: {{ spec.viscosity_min }},
+    vMax: {{ spec.viscosity_max }},
+    dMin: {{ spec.density_min }},
+    dMax: {{ spec.density_max }},
+    sand: {{ spec.sand_limit }},
+  };
+
+  function checkField(input, min, max) {
+    const v = parseFloat(input.value);
+    if (isNaN(v)) { input.style.borderColor = ''; return; }
+    const ok = (min === null || v >= min) && (max === null || v <= max);
+    input.style.borderColor = ok ? 'var(--success)' : 'var(--danger)';
+  }
+
+  document.querySelectorAll('[name$="viscosity_secs"]').forEach(el =>
+    el.addEventListener('input', () => checkField(el, SPEC.vMin, SPEC.vMax))
+  );
+  document.querySelectorAll('[name$="specific_gravity"]').forEach(el =>
+    el.addEventListener('input', () => checkField(el, SPEC.dMin, SPEC.dMax))
+  );
+  document.querySelectorAll('[name$="sand_content_pct"]').forEach(el =>
+    el.addEventListener('input', () => checkField(el, null, SPEC.sand))
+  );
+
+  // Dynamic slurry form addition (simple — mirrors formset prefix pattern)
+  let slurryCount = {{ formset.total_form_count }};
+  const PREFIX = 'slurry_checks';
+  const mgmt = document.querySelector(`[name="${PREFIX}-TOTAL_FORMS"]`);
+
+  function addSlurryForm() {
+    // Clone last form card and increment indices
+    const cards = document.querySelectorAll('.card');
+    const lastCard = Array.from(cards).filter(c =>
+      c.querySelector('[name^="slurry_checks"]')
+    ).pop();
+    if (!lastCard) return;
+
+    const clone = lastCard.cloneNode(true);
+    const newIdx = slurryCount;
+
+    // Update all name/id attributes
+    clone.innerHTML = clone.innerHTML
+      .replace(new RegExp(`${PREFIX}-(\\d+)-`, 'g'), `${PREFIX}-${newIdx}-`);
+
+    // Clear values
+    clone.querySelectorAll('input, select').forEach(el => el.value = '');
+
+    // Insert before add button
+    document.querySelector('.btn-add').insertAdjacentElement('beforebegin', clone);
+    slurryCount++;
+    mgmt.value = slurryCount;
+
+    // Re-attach live check listeners
+    clone.querySelectorAll('[name$="viscosity_secs"]').forEach(el =>
+      el.addEventListener('input', () => checkField(el, SPEC.vMin, SPEC.vMax))
+    );
+    clone.querySelectorAll('[name$="specific_gravity"]').forEach(el =>
+      el.addEventListener('input', () => checkField(el, SPEC.dMin, SPEC.dMax))
+    );
+    clone.querySelectorAll('[name$="sand_content_pct"]').forEach(el =>
+      el.addEventListener('input', () => checkField(el, null, SPEC.sand))
+    );
+  }
+</script>
+{% endblock %}

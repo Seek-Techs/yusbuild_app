@@ -1,0 +1,148 @@
+{% extends "piling/base.html" %}
+{% load piling_tags %}
+
+{% block title %}Concreting — YusBuild{% endblock %}
+
+{% block content %}
+<div class="page-title">Rebar & concreting</div>
+<div class="page-subtitle">Step 6 of 6 — Final operations data</div>
+
+<!-- Calculated reference from tremie step -->
+{% if theoretical_volume %}
+<div class="calc-box" style="margin-bottom:16px">
+  <div class="calc-row">
+    <span class="calc-label">Tremie total depth</span>
+    <span class="calc-value">{{ tremie_total }} m</span>
+  </div>
+  <div class="calc-row">
+    <span class="calc-label">Theoretical volume</span>
+    <span class="calc-value" style="color:#60a5fa">{{ theoretical_volume }} m³</span>
+  </div>
+  <div class="calc-row">
+    <span class="calc-label">Volume deviation</span>
+    <span class="calc-value" id="live-deviation">Enter actual concrete below</span>
+  </div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-title">Steel reinforcement</div>
+
+    <div class="field-group">
+      <label class="field-label">Main bars</label>
+      {{ form.main_bars_spec }}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Stiffeners</label>
+      {{ form.stiffener_spec }}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Spiral bars</label>
+      {{ form.spiral_bars_spec }}
+    </div>
+    <div class="field-group">
+      <div class="field-row">
+        {{ form.cover_blocks_fixed }}
+        <label class="field-label" style="margin:0">Cover blocks fixed</label>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Rebar lowering — start</label>
+      {{ form.rebar_lowering_start }}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Rebar lowering — end</label>
+      {{ form.rebar_lowering_end }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Flushing & inspection</div>
+
+    <div class="field-group">
+      <label class="field-label">Flushing — start</label>
+      {{ form.flushing_start }}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Flushing — end</label>
+      {{ form.flushing_end }}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Borehole inspection result</label>
+      {{ form.inspection_collapse }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Concreting</div>
+
+    <div class="field-group">
+      <label class="field-label">Casting — start</label>
+      {{ form.casting_start }}
+      {% if form.casting_start.errors %}<div class="field-error">{{ form.casting_start.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Casting — end</label>
+      {{ form.casting_end }}
+      {% if form.casting_end.errors %}<div class="field-error">{{ form.casting_end.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Actual concrete poured (m³)</label>
+      {{ form.actual_concrete_m3 }}
+      <div class="field-hint">
+        {% if theoretical_volume %}Target: {{ theoretical_volume }} m³{% endif %}
+      </div>
+      {% if form.actual_concrete_m3.errors %}<div class="field-error">{{ form.actual_concrete_m3.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="field-group">
+      <label class="field-label">Slump (mm)</label>
+      {{ form.concrete_slump_mm }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Audit — rough sheet photo</div>
+    <div class="field-hint" style="margin-bottom:12px">
+      Photograph your handwritten rough sheet. This is stored as audit proof
+      alongside the digital record.
+    </div>
+    {{ form.rough_sheet_photo }}
+    {% if form.rough_sheet_photo.errors %}<div class="field-error">{{ form.rough_sheet_photo.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="nav-buttons">
+    <a href="{% url 'piling:step_soil_log' pile.pk %}" class="btn btn-secondary">← Back</a>
+    <button type="submit" class="btn btn-primary">Save & review →</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+{% if theoretical_volume %}
+<script>
+  const THEO = {{ theoretical_volume }};
+  const LIMIT = {{ pile.project.volume_deviation_alert_pct }};
+  const display = document.getElementById('live-deviation');
+  const input = document.getElementById('id_actual_concrete_m3');
+
+  input && input.addEventListener('input', function() {
+    const actual = parseFloat(this.value);
+    if (isNaN(actual) || actual <= 0) {
+      display.textContent = 'Enter actual concrete below';
+      display.className = 'calc-value';
+      return;
+    }
+    const dev = ((actual - THEO) / THEO) * 100;
+    const sign = dev >= 0 ? '+' : '';
+    const label = `${sign}${dev.toFixed(1)}%`;
+    const isAlert = Math.abs(dev) > LIMIT;
+    display.textContent = isAlert ? `⚠ ${label} — exceeds ±${LIMIT}%` : `${label} ✓`;
+    display.className = `calc-value ${isAlert ? 'alert' : 'ok'}`;
+  });
+</script>
+{% endif %}
+{% endblock %}
