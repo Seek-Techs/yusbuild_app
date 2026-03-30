@@ -140,7 +140,13 @@ def step_tremie_entry(request, pile_pk):
     if request.method == "POST":
         formset = TremieFormSet(request.POST, instance=pile, prefix=TREMIE_PREFIX)
         if formset.is_valid():
-            formset.save()
+            instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            obj.delete()
+        for i, obj in enumerate(instances, start=1):
+            obj.sequence_no = i
+            obj.pile = pile
+            obj.save()
             messages.success(request, "Tremie sequence saved.")
             return redirect("piling:step_slurry_check", pile_pk=pile.pk)
         # Debug: expose errors in the message so you can see what failed
@@ -173,7 +179,13 @@ def step_slurry_check(request, pile_pk):
     if request.method == "POST":
         formset = SlurryFormSet(request.POST, instance=pile, prefix=SLURRY_PREFIX)
         if formset.is_valid():
-            formset.save()
+            instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            obj.delete()
+        for i, obj in enumerate(instances, start=1):
+            obj.sequence_no = i
+            obj.pile = pile
+            obj.save()
             messages.success(request, "Slurry readings saved.")
             return redirect("piling:step_soil_log", pile_pk=pile.pk)
         else:
@@ -212,7 +224,13 @@ def step_soil_log(request, pile_pk):
     if request.method == "POST":
         formset = SoilLayerFormSet(request.POST, instance=pile, prefix=SOIL_PREFIX)
         if formset.is_valid():
-            formset.save()
+            instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            obj.delete()
+        for i, obj in enumerate(instances, start=1):
+            obj.sequence_no = i
+            obj.pile = pile
+            obj.save()
             messages.success(request, "Soil log saved.")
             return redirect("piling:step_concreting", pile_pk=pile.pk)
         else:

@@ -139,7 +139,7 @@ class DrillingTimesForm(forms.ModelForm):
 class TremieSequenceForm(forms.ModelForm):
     class Meta:
         model = TremieSequence
-        fields = ["sequence_no", "length_m"]
+        fields = ["length_m"]
         widgets = {
             "sequence_no": forms.NumberInput(
                 attrs={
