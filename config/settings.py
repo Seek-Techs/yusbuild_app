@@ -218,7 +218,8 @@ INSTALLED_APPS = [
     'django_filters',
     'corsheaders',
     'projects',
-    'piling',                    # Your new Piling module
+    'piling', 
+    'piles',                   # Your new Piling module
 ]
 
 MIDDLEWARE = [
