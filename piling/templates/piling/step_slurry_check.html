@@ -79,69 +79,71 @@
 {% block extra_js %}
 <script>
   // Live inline QC flag — colours the field border as user types
-  const SPEC = {
-    vMin: {{ spec.viscosity_min }},
-    vMax: {{ spec.viscosity_max }},
-    dMin: {{ spec.density_min }},
-    dMax: {{ spec.density_max }},
-    sand: {{ spec.sand_limit }},
-  };
+const SPEC = {
+  vMin: {{ spec.viscosity_min }},
+  vMax: {{ spec.viscosity_max }},
+  dMin: {{ spec.density_min }},
+  dMax: {{ spec.density_max }},
+  sand: {{ spec.sand_limit }},
+};
 
-  function checkField(input, min, max) {
-    const v = parseFloat(input.value);
-    if (isNaN(v)) { input.style.borderColor = ''; return; }
-    const ok = (min === null || v >= min) && (max === null || v <= max);
-    input.style.borderColor = ok ? 'var(--success)' : 'var(--danger)';
+// FIX: correct formset prefix from view
+const PREFIX = '{{ slurry_prefix }}';
+
+// FIX: safer JS rendering
+let slurryCount = {{ formset.total_form_count|default:0 }};
+
+const mgmt = document.querySelector(`[name="${PREFIX}-TOTAL_FORMS"]`);
+
+function addSlurryForm() {
+
+  const cards = document.querySelectorAll('.card');
+
+  const lastCard = Array.from(cards).filter(c =>
+    c.querySelector('[name^="' + PREFIX + '"]')
+  ).pop();
+
+  if (!lastCard) return;
+
+  const clone = lastCard.cloneNode(true);
+
+  const newIdx = slurryCount;
+
+  // FIX: update name AND id attributes
+  clone.innerHTML = clone.innerHTML
+    .replace(new RegExp(`${PREFIX}-(\\d+)-`, 'g'), `${PREFIX}-${newIdx}-`)
+    .replace(new RegExp(`id_${PREFIX}-(\\d+)-`, 'g'), `id_${PREFIX}-${newIdx}-`);
+
+  // Clear values
+  clone.querySelectorAll('input, select').forEach(el => el.value = '');
+
+  // FIX: update title
+  const title = clone.querySelector('.card-title');
+
+  if(title){
+      title.textContent = "Reading check";
   }
 
-  document.querySelectorAll('[name$="viscosity_secs"]').forEach(el =>
+  document.querySelector('.btn-add')
+      .insertAdjacentElement('beforebegin', clone);
+
+  slurryCount++;
+
+  mgmt.value = slurryCount;
+
+  // FIX: listeners MUST stay inside function
+  clone.querySelectorAll('[name$="viscosity_secs"]').forEach(el =>
     el.addEventListener('input', () => checkField(el, SPEC.vMin, SPEC.vMax))
   );
-  document.querySelectorAll('[name$="specific_gravity"]').forEach(el =>
+
+  clone.querySelectorAll('[name$="specific_gravity"]').forEach(el =>
     el.addEventListener('input', () => checkField(el, SPEC.dMin, SPEC.dMax))
   );
-  document.querySelectorAll('[name$="sand_content_pct"]').forEach(el =>
+
+  clone.querySelectorAll('[name$="sand_content_pct"]').forEach(el =>
     el.addEventListener('input', () => checkField(el, null, SPEC.sand))
   );
 
-  // Dynamic slurry form addition (simple — mirrors formset prefix pattern)
-  let slurryCount = {{ formset.total_form_count }};
-  const PREFIX = '{{ slurry }}';
-  const mgmt = document.querySelector(`[name="${PREFIX}-TOTAL_FORMS"]`);
-
-  function addSlurryForm() {
-    // Clone last form card and increment indices
-    const cards = document.querySelectorAll('.card');
-    const lastCard = Array.from(cards).filter(c =>
-      c.querySelector('[name^="' + PREFIX + '"]')
-    ).pop();
-    if (!lastCard) return;
-
-    const clone = lastCard.cloneNode(true);
-    const newIdx = slurryCount;
-
-    // Update all name/id attributes
-    clone.innerHTML = clone.innerHTML
-      .replace(new RegExp(`${PREFIX}-(\\d+)-`, 'g'), `${PREFIX}-${newIdx}-`);
-
-    // Clear values
-    clone.querySelectorAll('input, select').forEach(el => el.value = '');
-
-    // Insert before add button
-    document.querySelector('.btn-add').insertAdjacentElement('beforebegin', clone);
-    slurryCount++;
-    mgmt.value = slurryCount;
-
-    // Re-attach live check listeners
-    clone.querySelectorAll('[name$="viscosity_secs"]').forEach(el =>
-      el.addEventListener('input', () => checkField(el, SPEC.vMin, SPEC.vMax))
-    );
-    clone.querySelectorAll('[name$="specific_gravity"]').forEach(el =>
-      el.addEventListener('input', () => checkField(el, SPEC.dMin, SPEC.dMax))
-    );
-    clone.querySelectorAll('[name$="sand_content_pct"]').forEach(el =>
-      el.addEventListener('input', () => checkField(el, null, SPEC.sand))
-    );
-  }
+}
 </script>
 {% endblock %}

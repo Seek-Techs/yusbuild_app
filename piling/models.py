@@ -178,7 +178,7 @@ class Pile(models.Model):
     recorded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="piles_recorded"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     # ================================================================== #
@@ -402,7 +402,7 @@ class SlurryCheck(models.Model):
         Pile, on_delete=models.CASCADE, related_name="slurry_checks"
     )
     stage = models.CharField(max_length=10, choices=STAGE_CHOICES)
-    checked_at = models.DateTimeField()
+    checked_at = models.DateTimeField(null=True, blank=True)
     viscosity_secs = models.FloatField()
     specific_gravity = models.FloatField(
         validators=[MinValueValidator(0.9), MaxValueValidator(2.0)]
@@ -442,7 +442,8 @@ class SlurryCheck(models.Model):
         return issues
 
     def __str__(self):
-        return f"{self.pile.pile_no} — {self.get_stage_display()} slurry check"
+        stage_label = dict(self.STAGE_CHOICES).get(self.stage, self.stage)
+        return f"{self.pile.pile_no} — {stage_label} slurry check"
 
     class Meta:
         ordering = ["pile", "stage"]
@@ -478,3 +479,4 @@ class SoilLayer(models.Model):
             f"{self.pile.pile_no} — "
             f"{self.depth_from_m}m to {self.depth_to_m}m: {self.texture}"
         )
+

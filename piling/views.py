@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from piles.services.calculations import calculate_pile
 
 from .models import Pile, PilingProject, TremieSequence, SlurryCheck, SoilLayer
 from .forms import (
@@ -91,7 +92,14 @@ def step_pile_info(request, pile_pk=None):
             pile = form.save(commit=False)
             pile.recorded_by = request.user
             pile.save()
-            messages.success(request, "Pile info saved.")
+            # 🔥 RUN CALCULATION ENGINE
+            result = calculate_pile(pile)
+
+            pile.total_length = result["total_length"]
+            pile.total_weight = result["total_weight"]
+            pile.save()
+
+            messages.success(request, "Pile info saved + calculated.")
             return redirect("piling:step_drilling_times", pile_pk=pile.pk)
     else:
         form = PileInfoForm(instance=pile)
@@ -135,37 +143,72 @@ def step_drilling_times(request, pile_pk):
 # ------------------------------------------------------------------ #
 @login_required
 def step_tremie_entry(request, pile_pk):
+
     pile = get_object_or_404(Pile, pk=pile_pk)
 
     if request.method == "POST":
-        formset = TremieFormSet(request.POST, instance=pile, prefix=TREMIE_PREFIX)
-        if formset.is_valid():
-            instances = formset.save(commit=False)
-        for obj in formset.deleted_objects:
-            obj.delete()
-        for i, obj in enumerate(instances, start=1):
-            obj.sequence_no = i
-            obj.pile = pile
-            obj.save()
-            messages.success(request, "Tremie sequence saved.")
-            return redirect("piling:step_slurry_check", pile_pk=pile.pk)
-        # Debug: expose errors in the message so you can see what failed
-        else:
-            for i, form_errors in enumerate(formset.errors):
-                if form_errors:
-                    messages.error(request, f"Row {i+1}: {form_errors}")
-            if formset.non_form_errors():
-                messages.error(request, f"Formset error: {formset.non_form_errors()}")
-    else:
-        formset = TremieFormSet(instance=pile, prefix=TREMIE_PREFIX)
 
-    return render(request, "piling/step_tremie_entry.html", {
-        "formset": formset,
-        "pile": pile,
-        "tremie_prefix": TREMIE_PREFIX,
-        "current_step": "tremie_entry",
-        "steps": STEPS,
-        "step_labels": STEP_LABELS,
+        formset = TremieFormSet(
+            request.POST,
+            instance=pile,
+            prefix=TREMIE_PREFIX
+        )
+
+        if formset.is_valid():
+
+            instances = formset.save(commit=False)
+
+            if hasattr(formset,'deleted_objects'):
+                for obj in formset.deleted_objects:
+                    obj.delete()
+
+            for i,obj in enumerate(instances,start=1):
+
+                obj.sequence_no=i
+                obj.pile=pile
+                obj.save()
+            formset.save_m2m() 
+            messages.success(request,"Tremie sequence saved")
+
+            return redirect(
+                "piling:step_slurry_check",
+                pile_pk=pile.pk
+            )
+
+        else:
+
+            for i,errors in enumerate(formset.errors):
+
+                if errors:
+
+                    messages.error(
+                        request,
+                        f"Row {i+1}: {errors}"
+                    )
+
+            if formset.non_form_errors():
+
+                messages.error(
+                    request,
+                    formset.non_form_errors()
+                )
+
+    else:
+
+        formset = TremieFormSet(
+            instance=pile,
+            prefix=TREMIE_PREFIX
+        )
+
+    return render(request,"piling/step_tremie_entry.html",{
+
+        "formset":formset,
+        "pile":pile,
+        "tremie_prefix":TREMIE_PREFIX,
+        "current_step":"tremie_entry",
+        "steps":STEPS,
+        "step_labels":STEP_LABELS
+
     })
 
 
@@ -174,81 +217,198 @@ def step_tremie_entry(request, pile_pk):
 # ------------------------------------------------------------------ #
 @login_required
 def step_slurry_check(request, pile_pk):
-    pile = get_object_or_404(Pile.objects.select_related("project"), pk=pile_pk)
+
+    pile = get_object_or_404(
+        Pile.objects.select_related("project"),
+        pk=pile_pk
+    )
 
     if request.method == "POST":
-        formset = SlurryFormSet(request.POST, instance=pile, prefix=SLURRY_PREFIX)
+
+        formset = SlurryFormSet(
+
+            request.POST,
+            instance=pile,
+            prefix=SLURRY_PREFIX
+
+        )
+
         if formset.is_valid():
+
             instances = formset.save(commit=False)
-        for obj in formset.deleted_objects:
-            obj.delete()
-        for i, obj in enumerate(instances, start=1):
-            obj.sequence_no = i
-            obj.pile = pile
-            obj.save()
-            messages.success(request, "Slurry readings saved.")
-            return redirect("piling:step_soil_log", pile_pk=pile.pk)
+
+            if hasattr(formset,'deleted_objects'):
+
+                for obj in formset.deleted_objects:
+
+                    obj.delete()
+
+            for i,obj in enumerate(instances,start=1):
+
+                obj.sequence_no = i
+                obj.pile = pile
+                obj.save()
+
+            formset.save_m2m() 
+
+            messages.success(
+                request,
+                "Slurry readings saved"
+            )
+
+            return redirect(
+
+                "piling:step_soil_log",
+                pile_pk=pile.pk
+
+            )
+
         else:
-            for i, form_errors in enumerate(formset.errors):
-                if form_errors:
-                    messages.error(request, f"Slurry row {i+1}: {form_errors}")
+
+            for i,errors in enumerate(formset.errors):
+
+                if errors:
+
+                    messages.error(
+
+                        request,
+                        f"Slurry row {i+1}: {errors}"
+
+                    )
+
+            if formset.non_form_errors():
+
+                messages.error(
+
+                    request,
+                    formset.non_form_errors()
+
+                )
+
     else:
-        formset = SlurryFormSet(instance=pile, prefix=SLURRY_PREFIX)
+
+        formset = SlurryFormSet(
+            instance=pile,
+            prefix=SLURRY_PREFIX
+
+        )
 
     spec = {
+
         "viscosity_min": pile.project.viscosity_min_secs,
         "viscosity_max": pile.project.viscosity_max_secs,
-        "density_min":   pile.project.density_min,
-        "density_max":   pile.project.density_max,
-        "sand_limit":    pile.project.sand_content_limit_pct,
+        "density_min": pile.project.density_min,
+        "density_max": pile.project.density_max,
+        "sand_limit": pile.project.sand_content_limit_pct,
+
     }
 
-    return render(request, "piling/step_slurry_check.html", {
-        "formset": formset,
-        "pile": pile,
-        "spec": spec,
-        "slurry_prefix": SLURRY_PREFIX,
-        "current_step": "slurry_check",
-        "steps": STEPS,
-        "step_labels": STEP_LABELS,
-    })
+    return render(
+
+        request,
+        "piling/step_slurry_check.html",
+
+        {
+
+            "formset":formset,
+            "pile":pile,
+            "spec":spec,
+            "slurry_prefix":SLURRY_PREFIX,
+            "current_step":"slurry_check",
+            "steps":STEPS,
+            "step_labels":STEP_LABELS
+
+        }
+
+    )
 
 
 # ------------------------------------------------------------------ #
 # Step 5 — Soil Log                                                    #
 # ------------------------------------------------------------------ #
 @login_required
-def step_soil_log(request, pile_pk):
-    pile = get_object_or_404(Pile, pk=pile_pk)
+def step_soil_log(request,pile_pk):
 
-    if request.method == "POST":
-        formset = SoilLayerFormSet(request.POST, instance=pile, prefix=SOIL_PREFIX)
+    pile=get_object_or_404(Pile,pk=pile_pk)
+
+    if request.method=="POST":
+
+        formset=SoilLayerFormSet(
+
+            request.POST,
+            instance=pile,
+            prefix=SOIL_PREFIX
+
+        )
+
         if formset.is_valid():
-            instances = formset.save(commit=False)
-        for obj in formset.deleted_objects:
-            obj.delete()
-        for i, obj in enumerate(instances, start=1):
-            obj.sequence_no = i
-            obj.pile = pile
-            obj.save()
-            messages.success(request, "Soil log saved.")
-            return redirect("piling:step_concreting", pile_pk=pile.pk)
+
+            instances=formset.save(commit=False)
+
+            if hasattr(formset,'deleted_objects'):
+
+                for obj in formset.deleted_objects:
+
+                    obj.delete()
+
+            for i,obj in enumerate(instances,start=1):
+
+                obj.sequence_no=i
+                obj.pile=pile
+                obj.save()
+
+            formset.save_m2m() 
+
+            messages.success(request,"Soil log saved")
+
+            return redirect(
+
+                "piling:step_concreting",
+                pile_pk=pile.pk
+
+            )
+
         else:
-            for i, form_errors in enumerate(formset.errors):
-                if form_errors:
-                    messages.error(request, f"Soil row {i+1}: {form_errors}")
+
+            for i,errors in enumerate(formset.errors):
+
+                if errors:
+
+                    messages.error(
+
+                        request,
+                        f"Soil row {i+1}: {errors}"
+
+                    )
+
+            if formset.non_form_errors():
+
+                messages.error(
+
+                    request,
+                    formset.non_form_errors()
+
+                )
+
     else:
-        formset = SoilLayerFormSet(instance=pile, prefix=SOIL_PREFIX)
 
-    return render(request, "piling/step_soil_log.html", {
-        "formset": formset,
-        "pile": pile,
-        "soil_prefix": SOIL_PREFIX,
-        "current_step": "soil_log",
-        "steps": STEPS,
-        "step_labels": STEP_LABELS,
+        formset=SoilLayerFormSet(
+
+            instance=pile,
+            prefix=SOIL_PREFIX
+
+        )
+
+    return render(request,"piling/step_soil_log.html",{
+
+        "formset":formset,
+        "pile":pile,
+        "soil_prefix":SOIL_PREFIX,
+        "current_step":"soil_log",
+        "steps":STEPS,
+        "step_labels":STEP_LABELS
+
     })
-
 
 # ------------------------------------------------------------------ #
 # Step 6 — Concreting                                                  #
